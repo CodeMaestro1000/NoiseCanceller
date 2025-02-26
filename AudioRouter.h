@@ -5,54 +5,48 @@
 #ifndef AUDIOROUTER_H
 #define AUDIOROUTER_H
 
-#include <array>
-
+#include <vector>
 #include "portaudio.h"
 #include "Filters.h"
 
-/*
- * AudioRouter interface.
- *
- */
-
-class AudioRouter {
-public:
-
-    virtual void startCapture() = 0;
-    virtual void stopCapture() = 0;
-    static  void info() {
-    };
-    // Implementations of the AudioRouter interface must implement their own virtual destructor
-    // This way, when the AudioRouter goes out of scope, then the correct destructor is called
-    // otherwise, what happens is up to the compiler :(
-    virtual ~AudioRouter(){};
+struct Microphone {
+    int deviceID;
+    PaDeviceInfo deviceInfo;
 };
 
-
-
-class PortAudioRouter final : public AudioRouter {
+class PortAudioRouter {
 private:
     PaStreamParameters inputParameters;
     PaStreamParameters outputParameters;
     PaStream *audioStream = nullptr;
 
+    Microphone inputMic, outputMic;
+
     int framesPerBuffer = 480;
     float sawToothValue = 0.0;
     bool is_active = false;
 
-    float tmpBuf[480];
     RNNFilter noiseFilter;
 
 public:
     PortAudioRouter();
 
-    void startCapture() override;
-    void stopCapture() override;
+    void startCapture();
+    void stopCapture();
+    void selectInputDevice(PaDeviceIndex deviceIdx);
+    void selectOutputDevice(PaDeviceIndex deviceIdx);
+    // read-only funcs
+    float computeSampleVolume(const float *sample) const;
+    void visualizeSignals(const float *inputSignal, const float *outputSignal) const;
 
-    friend int send(const void *, void *, unsigned long, const PaStreamCallbackTimeInfo*, PaStreamCallbackFlags, void *);
+    static std::vector<Microphone> listAvailableInputMicrophones();
+    static std::vector<Microphone> listAvailableRoutableMicrophones();
     static void info();
 
-    ~PortAudioRouter() override;
+
+    friend int send(const void *, void *, unsigned long, const PaStreamCallbackTimeInfo*, PaStreamCallbackFlags, void *);
+
+    ~PortAudioRouter();
 };
 
 
