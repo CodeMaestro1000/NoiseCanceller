@@ -1,13 +1,12 @@
 //
 // Created by Akoji Timothy on 19/02/2025.
 //
-
-#include "AudioRouter.h"
-
 #include <cmath>
 #include <iomanip>
 #include <iostream>
 #include <string>
+
+#include "AudioRouter.h"
 
 #define NUM_CHANNELS 1
 #define MAX_AUDIO_VOLUME 1 // max value of calculated signal volume
@@ -59,8 +58,9 @@ int send (
 
     // TODO: Use another thread to visualize data.
     // Simply point to the data, the thread does the rest.
-    // paRouter->visualizeSignals(inputData, outputData);
 
+    paRouter->inputSignal = inputData;
+    paRouter->outputSignal = outputData;
     return paContinue;
 }
 
@@ -114,6 +114,8 @@ void PortAudioRouter::startCapture() {
         throw std::runtime_error(err_str);
     }
     this->is_active = true;
+
+    this->visualizerThread = new std::thread(&PortAudioRouter::visualizeSignals, this);
     std::clog << "Capture started. Routing " << this->inputMic.deviceInfo.name << " => " <<this->outputMic.deviceInfo.name<< std::endl;
 }
 
@@ -125,6 +127,12 @@ void PortAudioRouter::stopCapture() {
         throw std::runtime_error(err_str);
     }
     this->is_active = false;
+
+    this->inputSignal = nullptr;
+    this->outputSignal = nullptr;
+    this->visualizerThread->join();
+    delete this->visualizerThread;
+
     std::clog << std::endl; // use this so that a new line is shown after signal viz
     std::clog << "Capture ended." << std::endl;
 }
@@ -195,23 +203,30 @@ float PortAudioRouter::computeSampleVolume(const float *sample) const {
 }
 
 
-void PortAudioRouter::visualizeSignals(const float *inputSignal, const float *outputSignal) const {
-    float displaySize = 100.0; // max size of volume bars
+void PortAudioRouter::visualizeSignals() const {
+    while (this->is_active) {
+        if (this->inputSignal == nullptr || this->outputSignal == nullptr) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(50)); // Save CPU cycles
+            continue;
+        }
+        float displaySize = 100.0; // max size of volume bars
 
-    std::cout<<"\r"; // with this, we can print over and over on the same starting from the first character in terminal
+        float inputVolume = this->computeSampleVolume(inputSignal);
+        float outputVolume = this->computeSampleVolume(outputSignal);
 
-    float inputVolume = this->computeSampleVolume(inputSignal);
-    float outputVolume = this->computeSampleVolume(outputSignal);
+        auto inputVolumeBar = static_cast<int>(std::round(inputVolume * displaySize));
+        auto outputVolumeBar = static_cast<int>(std::round(outputVolume * displaySize));
 
-    auto inputVolumeBar = static_cast<int>(std::round(inputVolume * displaySize));
-    auto outputVolumeBar = static_cast<int>(std::round(outputVolume * displaySize));
+        std::cout<<"\r"; // with this, we can print over and over on the same starting from the first character in terminal
+        std::cout<<"In: ";
+        std::cout << std::setw(50) << std::left << std::string(inputVolumeBar,  '#');
+        std::cout<<"Out: ";
+        std::cout << std::setw(50) << std::left << std::string(outputVolumeBar, '*');
 
-    std::cout<<"In: ";
-    std::cout << std::setw(50) << std::left << std::string(inputVolumeBar,  '#');
-    std::cout<<"Out: ";
-    std::cout << std::setw(50) << std::left << std::string(outputVolumeBar, '*');
+        std::cout.flush(); // flush the buffer so that everything is cleared and 'normal' print can resume
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
 
-    std::cout.flush(); // flush the buffer so that everything is cleared and 'normal' print can resume
 }
 
 void  PortAudioRouter::info() {
@@ -223,7 +238,6 @@ PortAudioRouter::~PortAudioRouter() {
 
     if (const PaError err = Pa_Terminate() != paNoError) {
         std::cerr << "Port Audio Termination Failed. Error: " << Pa_GetErrorText(err) << std::endl;
-        // throw std::runtime_error("Pa_Term failed");
     }
 
     this->is_active = false;
