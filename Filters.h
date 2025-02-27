@@ -7,23 +7,15 @@
 
 #include <rnnoise.h>
 
-class Filter {
-public:
-    virtual void apply(const float *inputBuffer, float *outputBuffer) = 0;
-    virtual ~Filter() = default;
-};
-
-
-class RNNFilter final: public Filter {
+class RNNFilter {
 private:
     DenoiseState *filterDenoiseState = rnnoise_create(nullptr);
 
 public:
     RNNFilter() = default;
-    void apply(const float *inputBuffer, float *outputBuffer) override;
-    ~RNNFilter() override;
+    void apply(const float *inputBuffer, float *outputBuffer);
+    ~RNNFilter();
 };
-
 
 
 #endif //FILTERS_H
