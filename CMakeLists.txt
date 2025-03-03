@@ -10,6 +10,9 @@ add_executable(NoiseCanceller main.cpp
         AudioRouter.h
         Filters.cpp
         Filters.h
+        GUI.h
+        GUI.cpp
 )
 target_link_libraries(NoiseCanceller /usr/local/lib/libportaudio.dylib)
 target_link_libraries(NoiseCanceller /usr/local/lib/librnnoise.dylib)
+target_link_libraries(NoiseCanceller /usr/local/lib/libfltk.dylib)
