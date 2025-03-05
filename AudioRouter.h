@@ -7,7 +7,6 @@
 
 #include <atomic>
 #include <vector>
-#include <thread>
 
 #include "portaudio.h"
 #include "Filters.h"
@@ -15,6 +14,10 @@
 struct Microphone {
     int deviceID;
     PaDeviceInfo deviceInfo;
+};
+
+struct Volumes {
+    float in, out;
 };
 
 class PortAudioRouter {
@@ -31,8 +34,6 @@ private:
     const float *inputSignal = nullptr;
     const float *outputSignal= nullptr;
 
-    std::thread *visualizerThread = nullptr;
-
     RNNFilter noiseFilter;
 
 public:
@@ -45,6 +46,8 @@ public:
     // read-only funcs
     float computeSampleVolume(const float *sample) const;
     void visualizeSignals() const;
+
+    Volumes getSignalVolumes() const;
 
     static std::vector<Microphone> listAvailableInputMicrophones();
     static std::vector<Microphone> listAvailableRoutableMicrophones();

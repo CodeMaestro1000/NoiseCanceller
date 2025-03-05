@@ -56,9 +56,6 @@ int send (
     if (inputBuffer) paRouter->noiseFilter.apply(inputData, outputData);
     else std::fill_n(outputData, framesPerBuffer, 0.0f);
 
-    // TODO: Use another thread to visualize data.
-    // Simply point to the data, the thread does the rest.
-
     paRouter->inputSignal = inputData;
     paRouter->outputSignal = outputData;
     return paContinue;
@@ -115,7 +112,6 @@ void PortAudioRouter::startCapture() {
     }
     this->is_active = true;
 
-    this->visualizerThread = new std::thread(&PortAudioRouter::visualizeSignals, this);
     std::clog << "Capture started. Routing " << this->inputMic.deviceInfo.name << " => " <<this->outputMic.deviceInfo.name<< std::endl;
 }
 
@@ -130,8 +126,6 @@ void PortAudioRouter::stopCapture() {
 
     this->inputSignal = nullptr;
     this->outputSignal = nullptr;
-    this->visualizerThread->join();
-    delete this->visualizerThread;
 
     std::clog << std::endl; // use this so that a new line is shown after signal viz
     std::clog << "Capture ended." << std::endl;
@@ -195,6 +189,8 @@ float PortAudioRouter::computeSampleVolume(const float *sample) const {
     // Why? Because the digital samples consist of +ve and -ve vals. These rep the flunctuation of
     // natural sound waves
 
+    if (sample == nullptr) return 0.0;
+
     float volume = 0.0;
     for (int i = 0; i < this->framesPerBuffer; i++) {
         volume = max(volume, std::abs(sample[i]));
@@ -202,31 +198,12 @@ float PortAudioRouter::computeSampleVolume(const float *sample) const {
     return volume; // ranges from 0 to 1. Original data ranges from -1 to +1.
 }
 
+Volumes PortAudioRouter::getSignalVolumes() const {
+    Volumes v;
+    v.in = this->computeSampleVolume(this->inputSignal);
+    v.out = this->computeSampleVolume(this->outputSignal);
 
-void PortAudioRouter::visualizeSignals() const {
-    while (this->is_active) {
-        if (this->inputSignal == nullptr || this->outputSignal == nullptr) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(50)); // Save CPU cycles
-            continue;
-        }
-        float displaySize = 100.0; // max size of volume bars
-
-        float inputVolume = this->computeSampleVolume(inputSignal);
-        float outputVolume = this->computeSampleVolume(outputSignal);
-
-        auto inputVolumeBar = static_cast<int>(std::round(inputVolume * displaySize));
-        auto outputVolumeBar = static_cast<int>(std::round(outputVolume * displaySize));
-
-        std::cout<<"\r"; // with this, we can print over and over on the same starting from the first character in terminal
-        std::cout<<"In: ";
-        std::cout << std::setw(50) << std::left << std::string(inputVolumeBar,  '#');
-        std::cout<<"Out: ";
-        std::cout << std::setw(50) << std::left << std::string(outputVolumeBar, '*');
-
-        std::cout.flush(); // flush the buffer so that everything is cleared and 'normal' print can resume
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    }
-
+    return v;
 }
 
 void  PortAudioRouter::info() {
